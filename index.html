@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rangrez — apna kapra, apni frock</title>
+<title>LoomMuse — apna kapra, apni frock</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -237,12 +237,108 @@
     color:#9a927f;
     line-height:1.5;
   }
+
+  .screen-wrap{ padding-bottom:64px; }
+  .hero-gradient{
+    background: linear-gradient(160deg, #8B5CF6, #EC4899);
+    color:#fff;
+    padding:70px 28px 50px;
+    text-align:center;
+    min-height:520px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+  }
+  .hero-gradient h1{
+    font-family:'Fraunces', serif;
+    font-size:38px;
+    margin:0 0 10px;
+  }
+  .hero-gradient p{
+    font-size:14px;
+    opacity:0.92;
+    margin:0 0 28px;
+    max-width:280px;
+    line-height:1.6;
+  }
+  .hero-btn{
+    background:#fff;
+    color:#8B5CF6;
+    border:none;
+    border-radius:14px;
+    padding:16px 36px;
+    font-family:'Work Sans', sans-serif;
+    font-weight:700;
+    font-size:15px;
+    cursor:pointer;
+  }
+  .section-header{
+    font-family:'Fraunces', serif;
+    font-size:24px;
+    font-weight:600;
+    padding:24px 20px 12px;
+  }
+  .saved-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+    padding:0 20px 20px;
+  }
+  .saved-card{
+    background:var(--card);
+    border-radius:14px;
+    overflow:hidden;
+    box-shadow:0 4px 12px rgba(36,31,24,0.08);
+  }
+  .saved-card img{ width:100%; display:block; aspect-ratio:2/3; object-fit:cover; }
+  .saved-card span{ display:block; padding:8px 10px; font-size:12px; font-weight:600; }
+  .empty-hint{
+    text-align:center;
+    color:#9a927f;
+    font-size:13px;
+    padding:20px;
+  }
+  .bottom-nav{
+    position:absolute;
+    left:0; right:0; bottom:0;
+    height:64px;
+    background:var(--card);
+    display:flex;
+    border-top:1px solid var(--line);
+  }
+  .nav-btn{
+    flex:1;
+    border:none;
+    background:none;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    font-size:19px;
+    color:#b0a894;
+    cursor:pointer;
+  }
+  .nav-btn span{ font-size:10.5px; font-weight:600; }
+  .nav-btn.active{ color:var(--teal); }
 </style>
 </head>
 <body>
-<div class="phone">
+<div class="phone" style="position:relative;">
+<div class="screen-wrap">
+
+<div class="screen" id="screen-home">
+  <div class="hero-gradient">
+    <h1>LoomMuse</h1>
+    <p>Apna kapra upload karo, AI se dekho tumhari frock kaisi banegi — phir seedha darzi ko bhejo.</p>
+    <button class="hero-btn" id="getStartedBtn">Get Started</button>
+  </div>
+</div>
+
+<div class="screen" id="screen-create" style="display:none;">
   <header>
-    <h1>Rangrez</h1>
+    <h1>LoomMuse</h1>
     <p>Apna kapra upload karo, style chuno — dekho tumhari frock kaisi banegi, phir seedha darzi ko bhejo.</p>
   </header>
 
@@ -310,13 +406,14 @@
     <button class="cta primary" id="shareBtn" disabled>Share to tailor</button>
   </div>
   <div style="padding:0 20px 20px;">
+    <button class="cta secondary" id="saveDesignBtn" style="width:100%; margin-bottom:10px;" disabled>💾 Save this design</button>
     <button class="cta secondary" id="aiPreviewBtn" style="width:100%;" disabled>✨ Try AI photorealistic preview (experimental, free)</button>
     <div id="aiStatus" style="font-size:11.5px; color:#8a8272; margin-top:8px; min-height:14px;"></div>
     <div id="aiResultWrap" style="display:none; margin-top:10px;">
       <img id="aiResultImg" style="width:100%; border-radius:12px;" alt="AI photorealistic preview">
     </div>
     <div id="aiFallback" style="display:none; margin-top:12px; background:#FFF8ED; border:1px solid var(--line); border-radius:12px; padding:14px; font-size:12.5px; color:#5a5142; line-height:1.5;">
-      <b>Automatic step didn't work</b> — this relies on free external services that can be unreliable. Do it manually instead, for free:
+      <b>Automatic step didn't work</b> — this relies on a free AI service that can be unreliable or rate-limited. Do it manually instead, for free:
       <ol style="margin:8px 0 8px 18px; padding:0;">
         <li>Download your design below.</li>
         <li>Open <a href="https://www.bing.com/images/create" target="_blank" style="color:var(--teal);">Bing Image Creator</a> (free) or ChatGPT.</li>
@@ -326,6 +423,32 @@
     </div>
   </div>
   <p class="note">Preview only — this shows how your fabric's print and color will sit on the frock's cut, not a stitchable pattern. Take it to your tailor along with the fabric for exact measurements.</p>
+</div>
+
+<div class="screen" id="screen-saved" style="display:none;">
+  <div class="section-header">Saved Designs</div>
+  <p class="empty-hint" id="savedEmpty">No saved designs yet — create one in the Create tab and tap Save.</p>
+  <div class="saved-grid" id="savedGrid"></div>
+</div>
+
+<div class="screen" id="screen-settings" style="display:none;">
+  <div class="section-header">Settings</div>
+  <div style="padding:0 20px 20px;">
+    <button class="cta secondary" id="connectBtn" style="width:100%;">🔗 Connect free Pollinations account</button>
+    <div id="connectStatus" style="font-size:11.5px; color:#8a8272; margin-top:6px;"></div>
+    <p style="font-size:12px; color:#8a8272; margin-top:28px; line-height:1.6;">LoomMuse lets you preview your own fabric on real Pakistani frock silhouettes before your tailor cuts it — free, and made for our style of dressing.</p>
+  </div>
+</div>
+
+</div>
+
+<nav class="bottom-nav">
+  <button class="nav-btn active" data-screen="home">🏠<span>Home</span></button>
+  <button class="nav-btn" data-screen="create">✂️<span>Create</span></button>
+  <button class="nav-btn" data-screen="saved">💾<span>Saved</span></button>
+  <button class="nav-btn" data-screen="settings">⚙️<span>Settings</span></button>
+</nav>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
@@ -679,6 +802,7 @@ function draw(){
     downloadBtn.disabled = !fabricImage;
     shareBtn.disabled = !fabricImage;
     aiPreviewBtn.disabled = !fabricImage;
+    saveDesignBtn.disabled = !fabricImage;
     return;
   }
 
@@ -727,6 +851,7 @@ function draw(){
   downloadBtn.disabled = !hasFabric;
   shareBtn.disabled = !hasFabric;
   aiPreviewBtn.disabled = !hasFabric;
+  saveDesignBtn.disabled = !hasFabric;
 }
 
 fabricInput.addEventListener('change', (e) => {
@@ -892,39 +1017,141 @@ function buildAiPrompt(){
   return 'Turn this flat clip-art illustration into a professional fashion photograph: a woman wearing this exact ' + styleName + ' in this exact fabric print and color, studio lighting, realistic fabric drape and folds, full body front view, photorealistic, high detail.';
 }
 
-async function uploadToCatbox(blob){
-  const form = new FormData();
-  form.append('reqtype', 'fileupload');
-  form.append('fileToUpload', blob, 'design.png');
-  const res = await fetch('https://catbox.moe/user/api.php', { method: 'POST', body: form });
-  if (!res.ok) throw new Error('upload failed');
-  const url = (await res.text()).trim();
-  if (!url.startsWith('http')) throw new Error('unexpected upload response');
-  return url;
+const POLLI_CLIENT_ID = 'pk_VV7Fpx5dVAjjg7DI';
+const POLLI_REDIRECT_URI = window.location.origin + window.location.pathname;
+
+const screenNames = ['home','create','saved','settings'];
+function showScreen(name){
+  screenNames.forEach(s => {
+    document.getElementById('screen-' + s).style.display = (s === name) ? 'block' : 'none';
+  });
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.screen === name);
+  });
+  if (name === 'saved') renderSavedGrid();
 }
+document.querySelectorAll('.nav-btn').forEach(b => {
+  b.addEventListener('click', () => showScreen(b.dataset.screen));
+});
+document.getElementById('getStartedBtn').addEventListener('click', () => showScreen('create'));
+
+function getSavedDesigns(){
+  try { return JSON.parse(localStorage.getItem('savedDesigns') || '[]'); } catch (e) { return []; }
+}
+function setSavedDesigns(list){
+  try { localStorage.setItem('savedDesigns', JSON.stringify(list)); } catch (e) { /* ignore */ }
+}
+const savedGrid = document.getElementById('savedGrid');
+const savedEmpty = document.getElementById('savedEmpty');
+function renderSavedGrid(){
+  const list = getSavedDesigns();
+  savedGrid.innerHTML = '';
+  savedEmpty.style.display = list.length ? 'none' : 'block';
+  list.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'saved-card';
+    card.innerHTML = '<img src="' + item.dataUrl + '" alt=""><span>' + item.label + '</span>';
+    savedGrid.appendChild(card);
+  });
+}
+const saveDesignBtn = document.getElementById('saveDesignBtn');
+saveDesignBtn.addEventListener('click', () => {
+  const list = getSavedDesigns();
+  list.unshift({
+    id: Date.now(),
+    dataUrl: canvas.toDataURL('image/png'),
+    label: mode === 'custom' ? 'Custom design' : currentStyle().en
+  });
+  setSavedDesigns(list.slice(0, 24));
+  saveDesignBtn.textContent = '✓ Saved';
+  setTimeout(() => { saveDesignBtn.textContent = '💾 Save this design'; }, 1500);
+});
+
+const connectBtn = document.getElementById('connectBtn');
+const connectStatus = document.getElementById('connectStatus');
+
+function getUserKey(){
+  try { return localStorage.getItem('polliUserKey'); } catch (e) { return null; }
+}
+function setUserKey(k){
+  try { localStorage.setItem('polliUserKey', k); } catch (e) { /* ignore */ }
+}
+
+function updateConnectUI(){
+  const key = getUserKey();
+  if (key){
+    connectBtn.textContent = '🔗 Reconnect Pollinations account';
+    connectStatus.textContent = 'Connected — ready to generate.';
+  } else {
+    connectBtn.textContent = '🔗 Connect free Pollinations account';
+    connectStatus.textContent = 'Connect once (free) to enable the AI preview below.';
+  }
+}
+
+connectBtn.addEventListener('click', () => {
+  const state = Math.random().toString(36).slice(2);
+  try { sessionStorage.setItem('polliState', state); } catch (e) { /* ignore */ }
+  const url = 'https://enter.pollinations.ai/authorize'
+    + '?client_id=' + encodeURIComponent(POLLI_CLIENT_ID)
+    + '&redirect_uri=' + encodeURIComponent(POLLI_REDIRECT_URI)
+    + '&state=' + encodeURIComponent(state)
+    + '&scope=image';
+  window.location.href = url;
+});
+
+(function handleAuthCallback(){
+  if (location.hash && location.hash.indexOf('api_key=') !== -1){
+    const params = new URLSearchParams(location.hash.slice(1));
+    const apiKey = params.get('api_key');
+    const state = params.get('state');
+    let savedState = null;
+    try { savedState = sessionStorage.getItem('polliState'); } catch (e) { /* ignore */ }
+    if (apiKey && (!savedState || state === savedState)){
+      setUserKey(apiKey);
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+  }
+  updateConnectUI();
+})();
 
 aiPreviewBtn.addEventListener('click', () => {
   aiFallbackPrompt.value = buildAiPrompt();
   aiResultWrap.style.display = 'none';
   aiFallback.style.display = 'none';
-  aiStatus.textContent = 'Uploading your design…';
   aiPreviewBtn.disabled = true;
+
+  const key = getUserKey();
+  if (!key){
+    aiStatus.textContent = 'Connect your free account above first.';
+    aiPreviewBtn.disabled = false;
+    return;
+  }
+
+  aiStatus.textContent = 'Generating photorealistic version… (10–30s)';
 
   canvas.toBlob(async (blob) => {
     try {
-      const hostedUrl = await uploadToCatbox(blob);
-      aiStatus.textContent = 'Generating photorealistic version… (10–30s)';
-      const prompt = buildAiPrompt();
-      const genUrl = 'https://gen.pollinations.ai/image/' + encodeURIComponent(prompt) +
-        '?image=' + encodeURIComponent(hostedUrl) + '&model=kontext&nologo=true&width=512&height=768';
-      const genRes = await fetch(genUrl);
-      if (!genRes.ok) throw new Error('generation failed');
-      const genBlob = await genRes.blob();
-      aiResultImg.src = URL.createObjectURL(genBlob);
+      const form = new FormData();
+      form.append('image', blob, 'design.png');
+      form.append('prompt', buildAiPrompt());
+      form.append('model', 'kontext');
+      const res = await fetch('https://gen.pollinations.ai/v1/images/edits', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + key },
+        body: form
+      });
+      if (!res.ok) throw new Error('generation failed: ' + res.status);
+      const json = await res.json();
+      const item = json.data && json.data[0];
+      let imgUrl = null;
+      if (item && item.url) imgUrl = item.url;
+      else if (item && item.b64_json) imgUrl = 'data:image/png;base64,' + item.b64_json;
+      if (!imgUrl) throw new Error('unexpected response shape');
+      aiResultImg.src = imgUrl;
       aiResultWrap.style.display = 'block';
       aiStatus.textContent = 'Done — AI-generated, may not be perfectly accurate to your fabric.';
     } catch (err) {
-      aiStatus.textContent = '';
+      aiStatus.textContent = 'That attempt failed (' + err.message + ').';
       aiFallback.style.display = 'block';
     } finally {
       aiPreviewBtn.disabled = false;
