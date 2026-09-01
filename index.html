@@ -407,13 +407,13 @@
   </div>
   <div style="padding:0 20px 20px;">
     <button class="cta secondary" id="saveDesignBtn" style="width:100%; margin-bottom:10px;" disabled>💾 Save this design</button>
-    <button class="cta secondary" id="aiPreviewBtn" style="width:100%;" disabled>✨ Try AI photorealistic preview (experimental, free)</button>
+    <button class="cta secondary" id="aiPreviewBtn" style="width:100%;" disabled>✨ Try AI photorealistic preview (free Space, experimental)</button>
     <div id="aiStatus" style="font-size:11.5px; color:#8a8272; margin-top:8px; min-height:14px;"></div>
     <div id="aiResultWrap" style="display:none; margin-top:10px;">
       <img id="aiResultImg" style="width:100%; border-radius:12px;" alt="AI photorealistic preview">
     </div>
     <div id="aiFallback" style="display:none; margin-top:12px; background:#FFF8ED; border:1px solid var(--line); border-radius:12px; padding:14px; font-size:12.5px; color:#5a5142; line-height:1.5;">
-      <b>Automatic step didn't work</b> — this relies on a free AI service that can be unreliable or rate-limited. Do it manually instead, for free:
+      <b>Automatic attempt didn't work.</b> Do this instead, free, in 3 steps:
       <ol style="margin:8px 0 8px 18px; padding:0;">
         <li>Download your design below.</li>
         <li>Open <a href="https://www.bing.com/images/create" target="_blank" style="color:var(--teal);">Bing Image Creator</a> (free) or ChatGPT.</li>
@@ -434,9 +434,8 @@
 <div class="screen" id="screen-settings" style="display:none;">
   <div class="section-header">Settings</div>
   <div style="padding:0 20px 20px;">
-    <button class="cta secondary" id="connectBtn" style="width:100%;">🔗 Connect free Pollinations account</button>
-    <div id="connectStatus" style="font-size:11.5px; color:#8a8272; margin-top:6px;"></div>
-    <p style="font-size:12px; color:#8a8272; margin-top:28px; line-height:1.6;">LoomMuse lets you preview your own fabric on real Pakistani frock silhouettes before your tailor cuts it — free, and made for our style of dressing.</p>
+    <p style="font-size:12px; color:#8a8272; line-height:1.6;">LoomMuse lets you preview your own fabric on real Pakistani frock silhouettes before your tailor cuts it — free, and made for our style of dressing.</p>
+    <p style="font-size:12px; color:#8a8272; margin-top:16px; line-height:1.6;">Want a photorealistic version of a design? Use the "Try AI photorealistic preview" button in Create — it attempts a free AI space automatically, and falls back to a manual Bing/ChatGPT step if that doesn't work.</p>
   </div>
 </div>
 
@@ -452,6 +451,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+<script type="module">
+  import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
+  window.connectGradioSpace = (space) => Client.connect(space);
+</script>
 <script>
 const NECKLINE_HOLE = "M178,60 C178,45 222,45 222,60 C222,75 178,75 178,60 Z";
 const SLEEVE_L = "C110,66 92,86 97,98 C102,110 122,116 135,119";
@@ -1017,8 +1020,42 @@ function buildAiPrompt(){
   return 'Turn this flat clip-art illustration into a professional fashion photograph: a woman wearing this exact ' + styleName + ' in this exact fabric print and color, studio lighting, realistic fabric drape and folds, full body front view, photorealistic, high detail.';
 }
 
-const POLLI_CLIENT_ID = 'pk_VV7Fpx5dVAjjg7DI';
-const POLLI_REDIRECT_URI = window.location.origin + window.location.pathname;
+const GRADIO_SPACE = 'fffiloni/stable-diffusion-img2img';
+
+aiPreviewBtn.addEventListener('click', () => {
+  aiFallbackPrompt.value = buildAiPrompt();
+  aiFallback.style.display = 'none';
+  aiResultWrap.style.display = 'none';
+  aiPreviewBtn.disabled = true;
+  aiStatus.textContent = 'Connecting to free AI space… this can take 30–90s.';
+
+  canvas.toBlob(async (blob) => {
+    try {
+      if (!window.connectGradioSpace) throw new Error('Gradio client script did not load');
+      const app = await window.connectGradioSpace(GRADIO_SPACE);
+      const schema = await app.view_api();
+      console.log('Gradio API schema for ' + GRADIO_SPACE + ':', schema);
+
+      aiStatus.textContent = 'Generating… (free CPU space, can be slow)';
+      const result = await app.predict('/predict', [blob, buildAiPrompt(), 0.75, 7.5, 25]);
+      console.log('Gradio result:', result);
+
+      const first = result && result.data && result.data[0];
+      const outUrl = (first && first.url) ? first.url : (typeof first === 'string' ? first : null);
+      if (!outUrl) throw new Error('unexpected output shape (check console)');
+
+      aiResultImg.src = outUrl;
+      aiResultWrap.style.display = 'block';
+      aiStatus.textContent = 'Done — AI-generated, may not be perfectly accurate to your fabric.';
+    } catch (err) {
+      console.error('AI preview failed:', err);
+      aiStatus.textContent = 'That attempt failed (' + err.message + '). Open your browser console for the full error.';
+      aiFallback.style.display = 'block';
+    } finally {
+      aiPreviewBtn.disabled = false;
+    }
+  }, 'image/png');
+});
 
 const screenNames = ['home','create','saved','settings'];
 function showScreen(name){
@@ -1065,98 +1102,6 @@ saveDesignBtn.addEventListener('click', () => {
   setSavedDesigns(list.slice(0, 24));
   saveDesignBtn.textContent = '✓ Saved';
   setTimeout(() => { saveDesignBtn.textContent = '💾 Save this design'; }, 1500);
-});
-
-const connectBtn = document.getElementById('connectBtn');
-const connectStatus = document.getElementById('connectStatus');
-
-function getUserKey(){
-  try { return localStorage.getItem('polliUserKey'); } catch (e) { return null; }
-}
-function setUserKey(k){
-  try { localStorage.setItem('polliUserKey', k); } catch (e) { /* ignore */ }
-}
-
-function updateConnectUI(){
-  const key = getUserKey();
-  if (key){
-    connectBtn.textContent = '🔗 Reconnect Pollinations account';
-    connectStatus.textContent = 'Connected — ready to generate.';
-  } else {
-    connectBtn.textContent = '🔗 Connect free Pollinations account';
-    connectStatus.textContent = 'Connect once (free) to enable the AI preview below.';
-  }
-}
-
-connectBtn.addEventListener('click', () => {
-  const state = Math.random().toString(36).slice(2);
-  try { sessionStorage.setItem('polliState', state); } catch (e) { /* ignore */ }
-  const url = 'https://enter.pollinations.ai/authorize'
-    + '?client_id=' + encodeURIComponent(POLLI_CLIENT_ID)
-    + '&redirect_uri=' + encodeURIComponent(POLLI_REDIRECT_URI)
-    + '&state=' + encodeURIComponent(state)
-    + '&scope=image';
-  window.location.href = url;
-});
-
-(function handleAuthCallback(){
-  if (location.hash && location.hash.indexOf('api_key=') !== -1){
-    const params = new URLSearchParams(location.hash.slice(1));
-    const apiKey = params.get('api_key');
-    const state = params.get('state');
-    let savedState = null;
-    try { savedState = sessionStorage.getItem('polliState'); } catch (e) { /* ignore */ }
-    if (apiKey && (!savedState || state === savedState)){
-      setUserKey(apiKey);
-      history.replaceState(null, '', location.pathname + location.search);
-    }
-  }
-  updateConnectUI();
-})();
-
-aiPreviewBtn.addEventListener('click', () => {
-  aiFallbackPrompt.value = buildAiPrompt();
-  aiResultWrap.style.display = 'none';
-  aiFallback.style.display = 'none';
-  aiPreviewBtn.disabled = true;
-
-  const key = getUserKey();
-  if (!key){
-    aiStatus.textContent = 'Connect your free account above first.';
-    aiPreviewBtn.disabled = false;
-    return;
-  }
-
-  aiStatus.textContent = 'Generating photorealistic version… (10–30s)';
-
-  canvas.toBlob(async (blob) => {
-    try {
-      const form = new FormData();
-      form.append('image', blob, 'design.png');
-      form.append('prompt', buildAiPrompt());
-      form.append('model', 'kontext');
-      const res = await fetch('https://gen.pollinations.ai/v1/images/edits', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + key },
-        body: form
-      });
-      if (!res.ok) throw new Error('generation failed: ' + res.status);
-      const json = await res.json();
-      const item = json.data && json.data[0];
-      let imgUrl = null;
-      if (item && item.url) imgUrl = item.url;
-      else if (item && item.b64_json) imgUrl = 'data:image/png;base64,' + item.b64_json;
-      if (!imgUrl) throw new Error('unexpected response shape');
-      aiResultImg.src = imgUrl;
-      aiResultWrap.style.display = 'block';
-      aiStatus.textContent = 'Done — AI-generated, may not be perfectly accurate to your fabric.';
-    } catch (err) {
-      aiStatus.textContent = 'That attempt failed (' + err.message + ').';
-      aiFallback.style.display = 'block';
-    } finally {
-      aiPreviewBtn.disabled = false;
-    }
-  }, 'image/png');
 });
 
 downloadBtn.addEventListener('click', () => {
