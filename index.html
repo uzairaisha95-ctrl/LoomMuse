@@ -1020,7 +1020,7 @@ function buildAiPrompt(){
   return 'Turn this flat clip-art illustration into a professional fashion photograph: a woman wearing this exact ' + styleName + ' in this exact fabric print and color, studio lighting, realistic fabric drape and folds, full body front view, photorealistic, high detail.';
 }
 
-const GRADIO_SPACE = 'fffiloni/stable-diffusion-img2img';
+const GRADIO_SPACE = 'black-forest-labs/FLUX.1-Kontext-Dev';
 
 aiPreviewBtn.addEventListener('click', () => {
   aiFallbackPrompt.value = buildAiPrompt();
@@ -1036,8 +1036,8 @@ aiPreviewBtn.addEventListener('click', () => {
       const schema = await app.view_api();
       console.log('Gradio API schema for ' + GRADIO_SPACE + ':', schema);
 
-      aiStatus.textContent = 'Generating… (free CPU space, can be slow)';
-      const result = await app.predict('/predict', [blob, buildAiPrompt(), 0.75, 7.5, 25]);
+      aiStatus.textContent = 'Generating… (free GPU space, can take a minute)';
+      const result = await app.predict('/predict', [blob, buildAiPrompt()]);
       console.log('Gradio result:', result);
 
       const first = result && result.data && result.data[0];
