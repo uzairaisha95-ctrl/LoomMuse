@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rangrez — apna kapra, apni frock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ivory:#FBF6EC;
+    --ink:#241F18;
+    --teal:#134B44;
+    --teal-deep:#0C332E;
+    --gold:#C9971C;
+    --rose:#B85C67;
+    --line:#E4DAC6;
+    --card:#FFFFFF;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--teal-deep);
+    font-family:'Work Sans', sans-serif;
+    color:var(--ink);
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:24px 0 60px;
+  }
+  .phone{
+    width:100%;
+    max-width:420px;
+    background:var(--ivory);
+    border-radius:28px;
+    overflow:hidden;
+    box-shadow:0 30px 60px rgba(0,0,0,0.35);
+  }
+  header{
+    padding:28px 24px 20px;
+    background:var(--teal);
+    color:var(--ivory);
+    position:relative;
+  }
+  header::after{
+    content:"";
+    position:absolute;
+    left:0; right:0; bottom:-1px;
+    height:14px;
+    background:var(--ivory);
+    border-radius:14px 14px 0 0;
+  }
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:32px;
+    margin:0 0 4px;
+    letter-spacing:0.2px;
+  }
+  header p{
+    margin:0;
+    font-size:14px;
+    opacity:0.82;
+    max-width:280px;
+    line-height:1.5;
+  }
+  main{ padding:22px 20px 8px; }
+  .step{
+    margin-bottom:26px;
+  }
+  .step-head{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .step-num{
+    font-family:'Fraunces', serif;
+    font-size:15px;
+    color:var(--gold);
+    font-weight:700;
+  }
+  .step-title{
+    font-family:'Fraunces', serif;
+    font-size:19px;
+    font-weight:600;
+  }
+  .step-sub{
+    font-size:12.5px;
+    color:#6b6355;
+    margin:2px 0 0 24px;
+  }
+
+  .uploader{
+    margin-left:24px;
+    border:1.5px dashed var(--line);
+    border-radius:16px;
+    background:var(--card);
+    padding:18px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    cursor:pointer;
+    transition:border-color .15s ease;
+  }
+  .uploader:hover{ border-color:var(--gold); }
+  .uploader input{ display:none; }
+  .swatch-preview{
+    width:52px; height:52px;
+    border-radius:10px;
+    background:repeating-linear-gradient(45deg,#eee,#eee 6px,#e2e2e2 6px,#e2e2e2 12px);
+    flex-shrink:0;
+    object-fit:cover;
+  }
+  .uploader-text b{ display:block; font-size:14px; }
+  .uploader-text span{ font-size:12px; color:#8a8272; }
+
+  .style-row{
+    margin-left:24px;
+    display:flex;
+    gap:10px;
+    overflow-x:auto;
+    padding-bottom:6px;
+    -webkit-overflow-scrolling:touch;
+  }
+  .style-chip{
+    flex-shrink:0;
+    width:92px;
+    border:none;
+    background:var(--card);
+    border-radius:14px;
+    padding:10px 8px 8px;
+    cursor:pointer;
+    border:1.5px solid transparent;
+    text-align:center;
+    font-family:'Work Sans', sans-serif;
+  }
+  .style-chip.active{
+    border-color:var(--teal);
+    background:#EFF4EC;
+  }
+  .style-chip svg{ width:100%; height:64px; }
+  .style-chip .en{ display:block; font-size:11.5px; font-weight:600; margin-top:4px; }
+  .style-chip .ur{ display:block; font-size:10.5px; color:#948c7c; }
+
+  .scale-row{
+    margin-left:24px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-size:12px;
+    color:#6b6355;
+  }
+  .scale-row input{ flex:1; accent-color:var(--teal); }
+
+  .preview-frame{
+    background:var(--card);
+    border-radius:18px;
+    padding:16px;
+    display:flex;
+    justify-content:center;
+    box-shadow:0 6px 18px rgba(36,31,24,0.08);
+  }
+  canvas{ max-width:100%; height:auto; }
+
+  .empty-hint{
+    font-size:12.5px;
+    color:#9a927f;
+    text-align:center;
+    padding:40px 20px;
+  }
+
+  .actions{
+    display:flex;
+    gap:10px;
+    padding:18px 20px 24px;
+  }
+  button.cta{
+    flex:1;
+    border:none;
+    border-radius:12px;
+    padding:14px 10px;
+    font-family:'Work Sans', sans-serif;
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+  }
+  .cta.primary{ background:var(--teal); color:var(--ivory); }
+  .cta.secondary{ background:transparent; color:var(--teal); border:1.5px solid var(--teal); }
+  .cta:disabled{ opacity:0.4; cursor:not-allowed; }
+
+  .note{
+    margin:0 20px 20px;
+    font-size:11.5px;
+    color:#9a927f;
+    line-height:1.5;
+  }
+</style>
+</head>
+<body>
+<div class="phone">
+  <header>
+    <h1>Rangrez</h1>
+    <p>Apna kapra upload karo, style chuno — dekho tumhari frock kaisi banegi, phir seedha darzi ko bhejo.</p>
+  </header>
+
+  <main>
+    <div class="step">
+      <div class="step-head">
+        <span class="step-num">1</span>
+        <span class="step-title">Your fabric</span>
+      </div>
+      <label class="uploader" for="fabricInput">
+        <img id="swatchPreview" class="swatch-preview" alt="">
+        <div class="uploader-text">
+          <b id="uploaderLabel">Upload a photo of your cloth</b>
+          <span>Any lawn, chiffon, or khaddar print works</span>
+        </div>
+        <input type="file" id="fabricInput" accept="image/*">
+      </label>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <span class="step-num">2</span>
+        <span class="step-title">Frock style</span>
+      </div>
+      <div class="style-row" id="styleRow"></div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <span class="step-num">3</span>
+        <span class="step-title">Preview</span>
+      </div>
+      <div class="scale-row">
+        <span>Print size</span>
+        <input type="range" id="scaleSlider" min="40" max="260" value="120">
+      </div>
+      <br>
+      <div class="preview-frame">
+        <canvas id="canvas" width="400" height="600"></canvas>
+      </div>
+    </div>
+  </main>
+
+  <div class="actions">
+    <button class="cta secondary" id="downloadBtn" disabled>Download</button>
+    <button class="cta primary" id="shareBtn" disabled>Share to tailor</button>
+  </div>
+  <p class="note">Preview only — this shows how your fabric's print and color will sit on the frock's cut, not a stitchable pattern. Take it to your tailor along with the fabric for exact measurements.</p>
+</div>
+
+<script>
+const NECKLINE_HOLE = "M185,55 C185,42 215,42 215,55 C215,68 185,68 185,55 Z";
+
+const STYLES = [
+  {
+    id: "aline",
+    en: "A-Line",
+    ur: "A-Line",
+    path: "M170,60 L155,140 L70,560 L330,560 L245,140 L230,60 C227,40 173,40 170,60 Z " + NECKLINE_HOLE
+  },
+  {
+    id: "umbrella",
+    en: "Umbrella-cut",
+    ur: "Chatri Cut",
+    path: "M170,60 L165,150 C120,220 90,350 60,560 L340,560 C310,350 280,220 235,150 L230,60 C227,40 173,40 170,60 Z " + NECKLINE_HOLE
+  },
+  {
+    id: "anarkali",
+    en: "Anarkali",
+    ur: "Anarkali",
+    path: "M175,60 L165,190 C120,260 80,400 65,560 L335,560 C320,400 280,260 235,190 L225,60 C222,40 178,40 175,60 Z " + NECKLINE_HOLE,
+    seam: "M200,190 C195,320 205,440 200,560"
+  },
+  {
+    id: "angrakha",
+    en: "Front-open",
+    ur: "Angrakha",
+    path: "M200,140 L180,50 L150,150 L60,560 L340,560 L250,150 L220,50 L200,140 Z",
+    seam: "M200,140 C230,220 250,320 280,420"
+  }
+];
+
+let fabricImage = null;
+let selectedStyleId = STYLES[0].id;
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const styleRow = document.getElementById('styleRow');
+const fabricInput = document.getElementById('fabricInput');
+const swatchPreview = document.getElementById('swatchPreview');
+const uploaderLabel = document.getElementById('uploaderLabel');
+const scaleSlider = document.getElementById('scaleSlider');
+const downloadBtn = document.getElementById('downloadBtn');
+const shareBtn = document.getElementById('shareBtn');
+
+function miniSvg(style){
+  return `<svg viewBox="0 0 400 600" xmlns="http://www.w3.org/2000/svg">
+    <path d="${style.path}" fill="#EFEAE0" stroke="#B9AF98" stroke-width="6" fill-rule="evenodd"/>
+  </svg>`;
+}
+
+function renderStyleRow(){
+  styleRow.innerHTML = '';
+  STYLES.forEach(style => {
+    const btn = document.createElement('button');
+    btn.className = 'style-chip' + (style.id === selectedStyleId ? ' active' : '');
+    btn.innerHTML = miniSvg(style) + `<span class="en">${style.en}</span><span class="ur">${style.ur}</span>`;
+    btn.addEventListener('click', () => {
+      selectedStyleId = style.id;
+      renderStyleRow();
+      draw();
+    });
+    styleRow.appendChild(btn);
+  });
+}
+
+function currentStyle(){
+  return STYLES.find(s => s.id === selectedStyleId);
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const style = currentStyle();
+  const outline = new Path2D(style.path);
+
+  if (fabricImage){
+    ctx.save();
+    ctx.clip(outline, 'evenodd');
+
+    const scale = Number(scaleSlider.value) / 100;
+    const tileW = fabricImage.width * scale;
+    const tileH = fabricImage.height * scale;
+    const off = document.createElement('canvas');
+    off.width = Math.max(1, tileW);
+    off.height = Math.max(1, tileH);
+    off.getContext('2d').drawImage(fabricImage, 0, 0, tileW, tileH);
+    const pattern = ctx.createPattern(off, 'repeat');
+    ctx.fillStyle = pattern;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.globalAlpha = 0.08;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  } else {
+    ctx.save();
+    ctx.fillStyle = '#F1ECE0';
+    ctx.fill(outline, 'evenodd');
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.strokeStyle = '#5A5142';
+  ctx.lineWidth = 3;
+  ctx.stroke(outline);
+  if (style.seam){
+    ctx.strokeStyle = 'rgba(90,81,66,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke(new Path2D(style.seam));
+  }
+  ctx.restore();
+
+  const hasFabric = !!fabricImage;
+  downloadBtn.disabled = !hasFabric;
+  shareBtn.disabled = !hasFabric;
+}
+
+fabricInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    const img = new Image();
+    img.onload = () => {
+      fabricImage = img;
+      swatchPreview.src = evt.target.result;
+      uploaderLabel.textContent = file.name;
+      draw();
+    };
+    img.src = evt.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+scaleSlider.addEventListener('input', draw);
+
+downloadBtn.addEventListener('click', () => {
+  const link = document.createElement('a');
+  link.download = 'rangrez-' + selectedStyleId + '.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+
+shareBtn.addEventListener('click', async () => {
+  canvas.toBlob(async (blob) => {
+    const file = new File([blob], 'rangrez-frock.png', { type: 'image/png' });
+    const text = 'Yeh dekhein — is kapre se ' + currentStyle().en + ' frock banwani hai.';
+    if (navigator.canShare && navigator.canShare({ files: [file] })){
+      try {
+        await navigator.share({ files: [file], text });
+        return;
+      } catch (err) { /* user cancelled or unsupported, fall through */ }
+    }
+    const link = document.createElement('a');
+    link.download = 'rangrez-frock.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    window.open('https://wa.me/?text=' + encodeURIComponent(text + ' (image attached separately)'), '_blank');
+  }, 'image/png');
+});
+
+renderStyleRow();
+draw();
+</script>
+</body>
+</html>
