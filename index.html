@@ -1037,7 +1037,7 @@ aiPreviewBtn.addEventListener('click', () => {
       console.log('Gradio API schema for ' + GRADIO_SPACE + ':', schema);
 
       aiStatus.textContent = 'Generating… (free GPU space, can take a minute)';
-      const result = await app.predict('/predict', [blob, buildAiPrompt()]);
+      const result = await app.predict('/infer', [blob, buildAiPrompt(), 0, true, 2.5, 28]);
       console.log('Gradio result:', result);
 
       const first = result && result.data && result.data[0];
