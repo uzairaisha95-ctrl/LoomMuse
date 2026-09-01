@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LoomMuse — apna kapra, apni style</title>
+<title>LoomMuse — apna kapra, apni frock</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -438,6 +438,8 @@
   <div style="padding:0 20px 20px;">
     <p style="font-size:12px; color:#8a8272; line-height:1.6;">LoomMuse lets you preview your own fabric on real Pakistani frock silhouettes before your tailor cuts it — free, and made for our style of dressing.</p>
     <p style="font-size:12px; color:#8a8272; margin-top:16px; line-height:1.6;">Want a photorealistic version of a design? Use the "Try AI photorealistic preview" button in Create — it attempts a free AI space automatically, and falls back to a manual Bing/ChatGPT step if that doesn't work.</p>
+    <p style="font-size:12px; color:#8a8272; margin-top:20px; margin-bottom:6px; line-height:1.6;">Getting a quota error on the AI preview? Paste a free Hugging Face token here for more runs — get one at <a href="https://huggingface.co/settings/tokens" target="_blank" style="color:var(--teal);">huggingface.co/settings/tokens</a> (choose "Read" access).</p>
+    <input type="text" id="hfTokenInput" placeholder="hf_..." style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--line); font-size:12px; font-family:inherit; box-sizing:border-box;">
   </div>
 </div>
 
@@ -455,7 +457,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
 <script type="module">
   import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
-  window.connectGradioSpace = (space) => Client.connect(space);
+  window.connectGradioSpace = (space, hfToken) => Client.connect(space, hfToken ? { hf_token: hfToken } : {});
 </script>
 <script>
 const NECKLINE_HOLE = "M178,60 C178,45 222,45 222,60 C222,75 178,75 178,60 Z";
@@ -1088,6 +1090,16 @@ function buildAiPrompt(){
 }
 
 const GRADIO_SPACE = 'black-forest-labs/FLUX.1-Kontext-Dev';
+const hfTokenInput = document.getElementById('hfTokenInput');
+
+try {
+  const savedToken = localStorage.getItem('hfToken');
+  if (savedToken) hfTokenInput.value = savedToken;
+} catch (e) { /* ignore */ }
+
+hfTokenInput.addEventListener('change', () => {
+  try { localStorage.setItem('hfToken', hfTokenInput.value.trim()); } catch (e) { /* ignore */ }
+});
 
 function runAiPreview(){
   if (!fabricImage) return;
@@ -1100,7 +1112,8 @@ function runAiPreview(){
   canvas.toBlob(async (blob) => {
     try {
       if (!window.connectGradioSpace) throw new Error('Gradio client script did not load');
-      const app = await window.connectGradioSpace(GRADIO_SPACE);
+      const hfToken = hfTokenInput.value.trim();
+      const app = await window.connectGradioSpace(GRADIO_SPACE, hfToken || null);
       const schema = await app.view_api();
       console.log('Gradio API schema for ' + GRADIO_SPACE + ':', schema);
 
