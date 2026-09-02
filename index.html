@@ -457,7 +457,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
 <script type="module">
   import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
-  window.connectGradioSpace = (space, hfToken) => Client.connect(space, hfToken ? { hf_token: hfToken } : {});
+  window.connectGradioSpace = (space, hfToken) => Client.connect(space, hfToken ? { token: hfToken } : {});
 </script>
 <script>
 const NECKLINE_HOLE = "M178,60 C178,45 222,45 222,60 C222,75 178,75 178,60 Z";
