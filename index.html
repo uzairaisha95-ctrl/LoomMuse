@@ -440,6 +440,28 @@
     <p style="font-size:12px; color:#8a8272; margin-top:16px; line-height:1.6;">Want a photorealistic version of a design? Use the "Try AI photorealistic preview" button in Create — it attempts a free AI space automatically, and falls back to a manual Bing/ChatGPT step if that doesn't work.</p>
     <p style="font-size:12px; color:#8a8272; margin-top:20px; margin-bottom:6px; line-height:1.6;">Getting a quota error on the AI preview? Paste a free Hugging Face token here for more runs — get one at <a href="https://huggingface.co/settings/tokens" target="_blank" style="color:var(--teal);">huggingface.co/settings/tokens</a> (choose "Read" access).</p>
     <input type="text" id="hfTokenInput" placeholder="hf_..." style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--line); font-size:12px; font-family:inherit; box-sizing:border-box;">
+    <button class="cta secondary" id="goBatchBtn" style="width:100%; margin-top:20px;">📦 Batch export for AI training</button>
+  </div>
+</div>
+
+<div class="screen" id="screen-batch" style="display:none;">
+  <div class="section-header">Batch Export</div>
+  <div style="padding:0 20px 20px;">
+    <p style="font-size:12px; color:#8a8272; line-height:1.6;">Upload several fabric photos, pick which styles to pair them with, and generate every combination in one go — a ZIP of "before" images for training your own AI model.</p>
+
+    <label class="uploader" for="batchFabricInput" style="margin-left:0; margin-top:14px;">
+      <div class="uploader-text">
+        <b id="batchFabricLabel">Upload multiple fabric photos</b>
+        <span>Select as many as you like at once</span>
+      </div>
+      <input type="file" id="batchFabricInput" accept="image/*" multiple>
+    </label>
+
+    <div class="step-sub" style="margin:16px 0 8px; margin-left:0;">Styles to include</div>
+    <div id="batchStyleList" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+
+    <button class="cta primary" id="batchGenerateBtn" style="width:100%; margin-top:18px;" disabled>Generate ZIP</button>
+    <div id="batchStatus" style="font-size:12px; color:#8a8272; margin-top:10px; min-height:16px;"></div>
   </div>
 </div>
 
@@ -455,6 +477,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script type="module">
   import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
   window.connectGradioSpace = (space, hfToken) => Client.connect(space, hfToken ? { token: hfToken } : {});
@@ -703,49 +726,49 @@ function renderTrimRow(suggestions){
   trimRow.appendChild(custom);
 }
 
-function drawFlowerDot(cx, cy, r, color){
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.globalAlpha = 0.85;
+function drawFlowerDot(targetCtx, cx, cy, r, color){
+  targetCtx.save();
+  targetCtx.fillStyle = color;
+  targetCtx.globalAlpha = 0.85;
   for (let i = 0; i < 5; i++){
     const a = i * (2*Math.PI/5);
     const px = cx + Math.cos(a)*r*0.8;
     const py = cy + Math.sin(a)*r*0.8;
-    ctx.beginPath();
-    ctx.arc(px, py, r*0.55, 0, 2*Math.PI);
-    ctx.fill();
+    targetCtx.beginPath();
+    targetCtx.arc(px, py, r*0.55, 0, 2*Math.PI);
+    targetCtx.fill();
   }
-  ctx.beginPath();
-  ctx.arc(cx, cy, r*0.45, 0, 2*Math.PI);
-  ctx.fillStyle = '#5A5142';
-  ctx.fill();
-  ctx.restore();
+  targetCtx.beginPath();
+  targetCtx.arc(cx, cy, r*0.45, 0, 2*Math.PI);
+  targetCtx.fillStyle = '#5A5142';
+  targetCtx.fill();
+  targetCtx.restore();
 }
-function drawLace(x1, y1, x2, y2, color, radius){
+function drawLace(targetCtx, x1, y1, x2, y2, color, radius){
   radius = radius || 9;
   const dx = x2-x1, dy = y2-y1;
   const len = Math.sqrt(dx*dx + dy*dy);
   const count = Math.max(3, Math.round(len / (radius*1.8)));
   const stepX = dx/count, stepY = dy/count;
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
-  ctx.stroke();
+  targetCtx.save();
+  targetCtx.fillStyle = color;
+  targetCtx.strokeStyle = color;
+  targetCtx.lineWidth = 2;
+  targetCtx.beginPath();
+  targetCtx.moveTo(x1,y1); targetCtx.lineTo(x2,y2);
+  targetCtx.stroke();
   for (let i=0; i<count; i++){
     const cx = x1 + stepX*(i+0.5);
     const cy = y1 + stepY*(i+0.5);
-    ctx.beginPath();
-    ctx.arc(cx, cy+radius*0.6, radius*0.85, 0, Math.PI, false);
-    ctx.fill();
-    ctx.lineWidth = 0.75;
-    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-    ctx.stroke();
-    ctx.strokeStyle = color;
+    targetCtx.beginPath();
+    targetCtx.arc(cx, cy+radius*0.6, radius*0.85, 0, Math.PI, false);
+    targetCtx.fill();
+    targetCtx.lineWidth = 0.75;
+    targetCtx.strokeStyle = 'rgba(0,0,0,0.25)';
+    targetCtx.stroke();
+    targetCtx.strokeStyle = color;
   }
-  ctx.restore();
+  targetCtx.restore();
 }
 
 function miniSvg(style){
@@ -863,10 +886,10 @@ function draw(){
   }
   ctx.restore();
 
-  if (style.hemSegments) style.hemSegments.forEach(seg => drawLace(...seg, trimColor));
-  else if (style.hem) drawLace(...style.hem, trimColor);
-  if (style.neckline) drawLace(...style.neckline, trimColor, 6);
-  if (style.flowers) style.flowers.forEach(f => drawFlowerDot(f[0], f[1], f[2], trimColor));
+  if (style.hemSegments) style.hemSegments.forEach(seg => drawLace(ctx, ...seg, trimColor));
+  else if (style.hem) drawLace(ctx, ...style.hem, trimColor);
+  if (style.neckline) drawLace(ctx, ...style.neckline, trimColor, 6);
+  if (style.flowers) style.flowers.forEach(f => drawFlowerDot(ctx, f[0], f[1], f[2], trimColor));
 
   const hasFabric = !!fabricImage;
   downloadBtn.disabled = !hasFabric;
@@ -1152,7 +1175,7 @@ function runAiPreview(){
 
 aiPreviewBtn.addEventListener('click', runAiPreview);
 
-const screenNames = ['home','create','saved','settings'];
+const screenNames = ['home','create','saved','settings','batch'];
 function showScreen(name){
   screenNames.forEach(s => {
     document.getElementById('screen-' + s).style.display = (s === name) ? 'block' : 'none';
@@ -1166,6 +1189,135 @@ document.querySelectorAll('.nav-btn').forEach(b => {
   b.addEventListener('click', () => showScreen(b.dataset.screen));
 });
 document.getElementById('getStartedBtn').addEventListener('click', () => showScreen('create'));
+document.getElementById('goBatchBtn').addEventListener('click', () => showScreen('batch'));
+
+function renderCompositeToCanvas(targetCanvas, fabricImg, style, trimColorHex, repeatsAcross){
+  const tctx = targetCanvas.getContext('2d');
+  tctx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+  const outline = new Path2D(style.path);
+
+  const tileW = targetCanvas.width / (repeatsAcross || 4);
+  const tileH = tileW * (fabricImg.height / fabricImg.width);
+  const off = document.createElement('canvas');
+  off.width = Math.max(1, tileW);
+  off.height = Math.max(1, tileH);
+  off.getContext('2d').drawImage(fabricImg, 0, 0, tileW, tileH);
+  const pattern = tctx.createPattern(off, 'repeat');
+
+  tctx.save();
+  tctx.clip(outline, 'evenodd');
+  tctx.fillStyle = pattern;
+  tctx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+  tctx.globalAlpha = 0.08;
+  tctx.fillStyle = '#000';
+  tctx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+  tctx.globalAlpha = 1;
+  tctx.restore();
+
+  tctx.save();
+  tctx.strokeStyle = '#5A5142';
+  tctx.lineWidth = 3;
+  tctx.stroke(outline);
+  if (style.details){
+    tctx.strokeStyle = 'rgba(90,81,66,0.55)';
+    tctx.lineWidth = 1.5;
+    tctx.setLineDash([5,4]);
+    style.details.forEach(d => tctx.stroke(new Path2D(d)));
+    tctx.setLineDash([]);
+  }
+  tctx.restore();
+
+  if (style.hemSegments) style.hemSegments.forEach(seg => drawLace(tctx, ...seg, trimColorHex));
+  else if (style.hem) drawLace(tctx, ...style.hem, trimColorHex);
+  if (style.neckline) drawLace(tctx, ...style.neckline, trimColorHex, 6);
+  if (style.flowers) style.flowers.forEach(f => drawFlowerDot(tctx, f[0], f[1], f[2], trimColorHex));
+}
+
+const batchStyleList = document.getElementById('batchStyleList');
+const batchSelectedStyles = new Set(STYLES.map(s => s.id));
+function renderBatchStyleList(){
+  batchStyleList.innerHTML = '';
+  STYLES.forEach(style => {
+    const label = document.createElement('label');
+    label.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:11.5px;background:#fff;padding:7px 9px;border-radius:8px;border:1px solid var(--line);cursor:pointer;';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = batchSelectedStyles.has(style.id);
+    cb.addEventListener('change', () => {
+      if (cb.checked) batchSelectedStyles.add(style.id); else batchSelectedStyles.delete(style.id);
+    });
+    label.appendChild(cb);
+    label.append(style.en);
+    batchStyleList.appendChild(label);
+  });
+}
+renderBatchStyleList();
+
+let batchFabricFiles = [];
+const batchFabricInput = document.getElementById('batchFabricInput');
+const batchFabricLabel = document.getElementById('batchFabricLabel');
+const batchGenerateBtn = document.getElementById('batchGenerateBtn');
+const batchStatus = document.getElementById('batchStatus');
+
+batchFabricInput.addEventListener('change', (e) => {
+  batchFabricFiles = Array.from(e.target.files);
+  batchFabricLabel.textContent = batchFabricFiles.length + ' fabric(s) selected';
+  batchGenerateBtn.disabled = batchFabricFiles.length === 0;
+});
+
+function loadImageFromFile(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = evt.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+batchGenerateBtn.addEventListener('click', async () => {
+  const styles = STYLES.filter(s => batchSelectedStyles.has(s.id));
+  if (!batchFabricFiles.length || !styles.length){
+    batchStatus.textContent = 'Select at least one fabric and one style first.';
+    return;
+  }
+  batchGenerateBtn.disabled = true;
+  const zip = new JSZip();
+  const offCanvas = document.createElement('canvas');
+  offCanvas.width = 400; offCanvas.height = 600;
+  let count = 0;
+  const total = batchFabricFiles.length * styles.length;
+
+  for (let fi = 0; fi < batchFabricFiles.length; fi++){
+    const file = batchFabricFiles[fi];
+    batchStatus.textContent = 'Loading fabric ' + (fi + 1) + '/' + batchFabricFiles.length + '…';
+    let img;
+    try { img = await loadImageFromFile(file); } catch (e) { continue; }
+    const suggestions = suggestTrims(img);
+    const trimHex = suggestions[0].hex;
+    for (const style of styles){
+      renderCompositeToCanvas(offCanvas, img, style, trimHex, 4);
+      const blob = await new Promise(res => offCanvas.toBlob(res, 'image/png'));
+      zip.file('fabric' + (fi + 1) + '_' + style.id + '.png', blob);
+      count++;
+      batchStatus.textContent = 'Generated ' + count + '/' + total + '…';
+    }
+  }
+
+  batchStatus.textContent = 'Zipping…';
+  const content = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(content);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'loommuse-training-batch.zip';
+  a.click();
+  batchStatus.textContent = 'Done — ' + count + ' images downloaded as a ZIP.';
+  batchGenerateBtn.disabled = false;
+});
 
 function getSavedDesigns(){
   try { return JSON.parse(localStorage.getItem('savedDesigns') || '[]'); } catch (e) { return []; }
