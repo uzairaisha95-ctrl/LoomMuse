@@ -1084,9 +1084,21 @@ const aiResultImg = document.getElementById('aiResultImg');
 const aiFallback = document.getElementById('aiFallback');
 const aiFallbackPrompt = document.getElementById('aiFallbackPrompt');
 
+function hueName(h){
+  const bands = [[15,'red'], [45,'orange'], [70,'yellow'], [170,'green'], [200,'teal'], [250,'blue'], [290,'purple'], [330,'pink'], [361,'red']];
+  for (const [max, name] of bands){ if (h < max) return name; }
+  return 'red';
+}
+
 function buildAiPrompt(){
   const styleName = mode === 'custom' ? 'this exact frock design' : currentStyle().en + ' style frock';
-  return 'Turn this flat clip-art illustration into a professional fashion photograph: a woman wearing this exact ' + styleName + ' in this exact fabric print and color, studio lighting, realistic fabric drape and folds, full body front view, photorealistic, high detail.';
+  let colorNote = '';
+  if (fabricImage){
+    const [r,g,b] = computeAverageColor(fabricImage);
+    const [h] = rgbToHsl(r,g,b);
+    colorNote = ' The fabric is predominantly ' + hueName(h) + ' toned — keep that exact color family and the same print pattern shown, do not substitute a different color or pattern.';
+  }
+  return 'Turn this flat clip-art illustration into a professional fashion photograph: a woman wearing this exact ' + styleName + ', preserving the exact fabric print and colors from the reference image as closely as possible.' + colorNote + ' Studio lighting, realistic fabric drape and folds, full body front view, photorealistic, high detail, faithful to the reference.';
 }
 
 const GRADIO_SPACE = 'black-forest-labs/FLUX.1-Kontext-Dev';
@@ -1118,7 +1130,7 @@ function runAiPreview(){
       console.log('Gradio API schema for ' + GRADIO_SPACE + ':', schema);
 
       aiStatus.textContent = 'Generating… (free GPU space, can take a minute)';
-      const result = await app.predict('/infer', [blob, buildAiPrompt(), 0, true, 2.5, 28]);
+      const result = await app.predict('/infer', [blob, buildAiPrompt(), 0, true, 6, 28]);
       console.log('Gradio result:', result);
 
       const first = result && result.data && result.data[0];
