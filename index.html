@@ -426,19 +426,11 @@
   </div>
   <div style="padding:0 20px 20px;">
     <button class="cta secondary" id="saveDesignBtn" style="width:100%; margin-bottom:10px;" disabled>💾 Save this design</button>
-    <button class="cta secondary" id="aiPreviewBtn" style="width:100%;" disabled>✨ Try AI photorealistic preview (free Space, experimental)</button>
+    <button class="cta secondary" id="aiPreviewBtn" style="width:100%;" disabled>✨ Generate AI garment try-on</button>
+    <div style="font-size:11px; color:#8a8272; margin-top:6px; line-height:1.4;">AI preview sends your design and fabric images to the configured AI service. API charges may apply.</div>
     <div id="aiStatus" style="font-size:11.5px; color:#8a8272; margin-top:8px; min-height:14px;"></div>
     <div id="aiResultWrap" style="display:none; margin-top:10px;">
       <img id="aiResultImg" style="width:100%; border-radius:12px;" alt="AI photorealistic preview">
-    </div>
-    <div id="aiFallback" style="display:none; margin-top:12px; background:#FFF8ED; border:1px solid var(--line); border-radius:12px; padding:14px; font-size:12.5px; color:#5a5142; line-height:1.5;">
-      <b>Automatic attempt didn't work.</b> Do this instead, free, in 3 steps:
-      <ol style="margin:8px 0 8px 18px; padding:0;">
-        <li>Download your design below.</li>
-        <li>Open <a href="https://www.bing.com/images/create" target="_blank" style="color:var(--teal);">Bing Image Creator</a> (free) or ChatGPT.</li>
-        <li>Upload the downloaded design image and paste this prompt:</li>
-      </ol>
-      <textarea id="aiFallbackPrompt" readonly style="width:100%; min-height:70px; font-size:11.5px; padding:8px; border-radius:8px; border:1px solid var(--line); font-family:inherit;"></textarea>
     </div>
   </div>
   <p class="note">Preview only — this shows how your fabric's print and color will sit on the frock's cut, not a stitchable pattern. Take it to your tailor along with the fabric for exact measurements.</p>
@@ -453,10 +445,11 @@
 <div class="screen" id="screen-settings" style="display:none;">
   <div class="section-header">Settings</div>
   <div style="padding:0 20px 20px;">
-    <p style="font-size:12px; color:#8a8272; line-height:1.6;">LoomMuse lets you preview your own fabric on real Pakistani frock silhouettes before your tailor cuts it — free, and made for our style of dressing.</p>
-    <p style="font-size:12px; color:#8a8272; margin-top:16px; line-height:1.6;">Want a photorealistic version of a design? Use the "Try AI photorealistic preview" button in Create — it attempts a free AI space automatically, and falls back to a manual Bing/ChatGPT step if that doesn't work.</p>
-    <p style="font-size:12px; color:#8a8272; margin-top:20px; margin-bottom:6px; line-height:1.6;">Getting a quota error on the AI preview? Paste a free Hugging Face token here for more runs — get one at <a href="https://huggingface.co/settings/tokens" target="_blank" style="color:var(--teal);">huggingface.co/settings/tokens</a> (choose "Read" access).</p>
-    <input type="text" id="hfTokenInput" placeholder="hf_..." style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--line); font-size:12px; font-family:inherit; box-sizing:border-box;">
+    <p style="font-size:12px; color:#8a8272; line-height:1.6;">LoomMuse previews your fabric on Pakistani garment styles. The basic canvas preview is free; photorealistic AI previews use a separately billed API.</p>
+    <p style="font-size:12px; color:#8a8272; margin-top:16px; line-height:1.6;">Photorealistic try-on sends your design photo and fabric photo to the LoomMuse AI endpoint. The OpenAI API key stays on that backend; API use may incur charges.</p>
+    <p style="font-size:12px; color:#8a8272; margin-top:16px; margin-bottom:6px; line-height:1.6;">Paste your deployed Cloudflare Worker URL (for example, https://loommuse-ai-tryon.YOUR-SUBDOMAIN.workers.dev/api/try-on):</p>
+    <input type="url" id="tryOnEndpointInput" placeholder="https://your-worker.workers.dev/api/try-on" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--line); font-size:12px; font-family:inherit; box-sizing:border-box;">
+    <p style="font-size:11px; color:#8a8272; line-height:1.5;">Deploy the included worker and set OPENAI_API_KEY as a Worker secret. Never put that key in this page.</p>
     <button class="cta secondary" id="goBatchBtn" style="width:100%; margin-top:20px;">📦 Batch export for AI training</button>
   </div>
 </div>
@@ -495,10 +488,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script type="module">
-  import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
-  window.connectGradioSpace = (space, hfToken) => Client.connect(space, hfToken ? { token: hfToken } : {});
-</script>
 <script>
 const NECKLINE_HOLE = "M178,60 C178,45 222,45 222,60 C222,75 178,75 178,60 Z";
 const SLEEVE_L = "C110,66 92,86 97,98 C102,110 122,116 135,119";
@@ -638,6 +627,7 @@ const STYLES = [
 ];
 
 let fabricImage = null;
+let selectedDesignImg = null;
 let selectedStyleId = STYLES[0].id;
 let mode = 'preset'; // 'preset' or 'custom' (from an uploaded design photo)
 let customMaskCanvas = null;
@@ -872,12 +862,12 @@ function renderStyleRow(){
     btn.className = 'style-chip' + (mode === 'preset' && style.id === selectedStyleId ? ' active' : '');
     btn.innerHTML = miniSvg(style) + `<span class="en">${style.en}</span><span class="ur">${style.ur}</span>`;
     btn.addEventListener('click', () => {
+      selectedDesignImg = null;
       mode = 'preset';
       maskTools.style.display = 'none';
       selectedStyleId = style.id;
       renderStyleRow();
       draw();
-      runAiPreview();
     });
     styleRow.appendChild(btn);
   });
@@ -891,7 +881,6 @@ function renderStyleRow(){
       maskTools.style.display = maskEditingAvailable ? 'block' : 'none';
       renderStyleRow();
       draw();
-      runAiPreview();
     });
     styleRow.appendChild(btn);
   }
@@ -1002,7 +991,6 @@ fabricInput.addEventListener('change', (e) => {
       trimColor = suggestions[0].hex;
       renderTrimRow(suggestions);
       draw();
-      runAiPreview();
     };
     img.src = evt.target.result;
   };
@@ -1022,6 +1010,7 @@ designInput.addEventListener('change', (e) => {
     customThumb = evt.target.result;
     const img = new Image();
     img.onload = () => {
+      selectedDesignImg = img;
       const src = document.createElement('canvas');
       src.width = canvas.width; src.height = canvas.height;
       const sctx = src.getContext('2d');
@@ -1067,7 +1056,6 @@ designInput.addEventListener('change', (e) => {
           designStatus.textContent = 'Detected automatically — edges may be rough.';
           renderStyleRow();
           draw();
-          runAiPreview();
         });
       }
       segmenter.send({ image: src });
@@ -1129,6 +1117,7 @@ function extractSketchMask(srcCanvas){
 
 function processSketchImage(img, dataUrl){
   customThumb = dataUrl;
+  selectedDesignImg = img;
   const src = document.createElement('canvas');
   src.width = canvas.width; src.height = canvas.height;
   const sctx = src.getContext('2d');
@@ -1147,7 +1136,6 @@ function processSketchImage(img, dataUrl){
   renderStyleRow();
   renderReferenceRow();
   draw();
-  runAiPreview();
 }
 
 const REFERENCE_DESIGNS = [
@@ -1188,6 +1176,7 @@ sketchInput.addEventListener('change', (e) => {
     customThumb = evt.target.result;
     const img = new Image();
     img.onload = () => {
+      selectedDesignImg = img;
       const src = document.createElement('canvas');
       src.width = canvas.width; src.height = canvas.height;
       const sctx = src.getContext('2d');
@@ -1207,7 +1196,6 @@ sketchInput.addEventListener('change', (e) => {
       sketchStatus.textContent = 'Traced — clean, high-contrast sketches work best.';
       renderStyleRow();
       draw();
-      runAiPreview();
 
     };
     img.src = evt.target.result;
@@ -1219,75 +1207,81 @@ const aiPreviewBtn = document.getElementById('aiPreviewBtn');
 const aiStatus = document.getElementById('aiStatus');
 const aiResultWrap = document.getElementById('aiResultWrap');
 const aiResultImg = document.getElementById('aiResultImg');
-const aiFallback = document.getElementById('aiFallback');
-const aiFallbackPrompt = document.getElementById('aiFallbackPrompt');
+const tryOnEndpointInput = document.getElementById('tryOnEndpointInput');
 
-function hueName(h){
-  const bands = [[15,'red'], [45,'orange'], [70,'yellow'], [170,'green'], [200,'teal'], [250,'blue'], [290,'purple'], [330,'pink'], [361,'red']];
-  for (const [max, name] of bands){ if (h < max) return name; }
-  return 'red';
+function getTryOnEndpoint(){
+  const value = (tryOnEndpointInput.value || '').trim();
+  return value.endsWith('/') ? value.slice(0, -1) : value;
 }
-
-function buildAiPrompt(){
-  const styleName = mode === 'custom' ? 'this exact frock design' : currentStyle().en + ' style frock';
-  let colorNote = '';
-  if (fabricImage){
-    const [r,g,b] = computeAverageColor(fabricImage);
-    const [h] = rgbToHsl(r,g,b);
-    colorNote = ' The fabric is predominantly ' + hueName(h) + ' toned — keep that exact color family and the same print pattern shown, do not substitute a different color or pattern.';
-  }
-  return 'Turn this flat clip-art illustration into a professional fashion photograph: a woman wearing this exact ' + styleName + ', preserving the exact fabric print and colors from the reference image as closely as possible.' + colorNote + ' Studio lighting, realistic fabric drape and folds, full body front view, photorealistic, high detail, faithful to the reference.';
-}
-
-const GRADIO_SPACE = 'black-forest-labs/FLUX.1-Kontext-Dev';
-const hfTokenInput = document.getElementById('hfTokenInput');
-
 try {
-  const savedToken = localStorage.getItem('hfToken');
-  if (savedToken) hfTokenInput.value = savedToken;
+  tryOnEndpointInput.value = localStorage.getItem('tryOnEndpoint') || '';
 } catch (e) { /* ignore */ }
-
-hfTokenInput.addEventListener('change', () => {
-  try { localStorage.setItem('hfToken', hfTokenInput.value.trim()); } catch (e) { /* ignore */ }
+tryOnEndpointInput.addEventListener('change', () => {
+  try { localStorage.setItem('tryOnEndpoint', getTryOnEndpoint()); } catch (e) { /* ignore */ }
 });
 
-function runAiPreview(){
-  if (!fabricImage) return;
-  aiFallbackPrompt.value = buildAiPrompt();
-  aiFallback.style.display = 'none';
-  aiResultWrap.style.display = 'none';
-  aiPreviewBtn.disabled = true;
-  aiStatus.textContent = 'Connecting to free AI space… this can take 30–90s.';
-
-  canvas.toBlob(async (blob) => {
-    try {
-      if (!window.connectGradioSpace) throw new Error('Gradio client script did not load');
-      const hfToken = hfTokenInput.value.trim();
-      const app = await window.connectGradioSpace(GRADIO_SPACE, hfToken || null);
-      const schema = await app.view_api();
-      console.log('Gradio API schema for ' + GRADIO_SPACE + ':', schema);
-
-      aiStatus.textContent = 'Generating… (free GPU space, can take a minute)';
-      const result = await app.predict('/infer', [blob, buildAiPrompt(), 0, true, 6, 28]);
-      console.log('Gradio result:', result);
-
-      const first = result && result.data && result.data[0];
-      const outUrl = (first && first.url) ? first.url : (typeof first === 'string' ? first : null);
-      if (!outUrl) throw new Error('unexpected output shape (check console)');
-
-      aiResultImg.src = outUrl;
-      aiResultWrap.style.display = 'block';
-      aiStatus.textContent = 'Done — AI-generated, may not be perfectly accurate to your fabric.';
-    } catch (err) {
-      console.error('AI preview failed:', err);
-      aiStatus.textContent = 'That attempt failed (' + err.message + '). Open your browser console for the full error.';
-      aiFallback.style.display = 'block';
-    } finally {
-      aiPreviewBtn.disabled = false;
-    }
-  }, 'image/png');
+function buildAiPrompt(){
+  const styleName = mode === 'custom' ? 'the exact garment design in image 1' : currentStyle().en + ' style garment';
+  return 'Edit image 1 as a photorealistic fashion try-on. Use image 2 only as the textile swatch. Apply image 2 fabric to the garment in image 1, matching its print, colors, motif scale, folds, and lighting as faithfully as possible. Preserve the original garment cut, seams, pose, person, face, skin, hair, hands, legs, shoes, and background. Fabric must appear only on garment cloth; never on skin, face, hair, hands, legs, footwear, or background. Do not add accessories or change the person. The requested garment is ' + styleName + '. If image 1 is a sketch, render that same design as a realistic garment while keeping its silhouette and details.';
 }
 
+function makePresetDesignImage(){
+  const source = document.createElement('canvas');
+  source.width = canvas.width; source.height = canvas.height;
+  const sctx = source.getContext('2d');
+  sctx.fillStyle = '#ffffff'; sctx.fillRect(0, 0, source.width, source.height);
+  const style = currentStyle();
+  const outline = new Path2D(style.path);
+  sctx.fillStyle = '#eee9df'; sctx.fill(outline, 'evenodd');
+  sctx.strokeStyle = '#625b50'; sctx.lineWidth = 3; sctx.stroke(outline);
+  return source;
+}
+
+function imageToUploadBlob(image, maxSide){
+  const ratio = Math.min(1, maxSide / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
+  const upload = document.createElement('canvas');
+  upload.width = Math.max(1, Math.round((image.naturalWidth || image.width) * ratio));
+  upload.height = Math.max(1, Math.round((image.naturalHeight || image.height) * ratio));
+  upload.getContext('2d').drawImage(image, 0, 0, upload.width, upload.height);
+  return new Promise((resolve, reject) => upload.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not prepare an image for upload')), 'image/jpeg', 0.9));
+}
+
+async function runAiPreview(){
+  if (!fabricImage){ aiStatus.textContent = 'Upload a fabric photo first.'; return; }
+  const endpoint = getTryOnEndpoint();
+  if (!endpoint){
+    aiStatus.textContent = 'Set the LoomMuse AI endpoint in Settings first. See the included README.';
+    return;
+  }
+  const designSource = selectedDesignImg || (mode === 'preset' ? makePresetDesignImage() : null);
+  if (!designSource){ aiStatus.textContent = 'Choose or upload a design first.'; return; }
+
+  aiResultWrap.style.display = 'none';
+  aiPreviewBtn.disabled = true;
+  aiStatus.textContent = 'Sending the design and fabric references to the AI service…';
+  try {
+    const [designBlob, fabricBlob] = await Promise.all([
+      imageToUploadBlob(designSource, 1536),
+      imageToUploadBlob(fabricImage, 1024)
+    ]);
+    const form = new FormData();
+    form.append('designImage', designBlob, 'design.jpg');
+    form.append('fabricImage', fabricBlob, 'fabric.jpg');
+    form.append('prompt', buildAiPrompt());
+    const response = await fetch(endpoint, { method: 'POST', body: form });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || ('AI service returned HTTP ' + response.status));
+    if (!result.imageDataUrl) throw new Error('AI service returned no image');
+    aiResultImg.src = result.imageDataUrl;
+    aiResultWrap.style.display = 'block';
+    aiStatus.textContent = 'Done. Check that the print and garment details match your fabric before sharing.';
+  } catch (err) {
+    console.error('AI try-on failed:', err);
+    aiStatus.textContent = 'Try-on failed: ' + err.message;
+  } finally {
+    aiPreviewBtn.disabled = false;
+  }
+}
 aiPreviewBtn.addEventListener('click', runAiPreview);
 
 const screenNames = ['home','create','saved','settings','batch'];
@@ -1542,10 +1536,3 @@ shareBtn.addEventListener('click', async () => {
 renderStyleRow();
 renderTrimRow([{ name: 'Classic gota gold', hex: '#C9971C' }]);
 draw();
-</script>
-</body>
-</html>
-
-
-
-
