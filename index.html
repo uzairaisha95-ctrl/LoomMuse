@@ -1140,9 +1140,9 @@ function processSketchImage(img, dataUrl){
   else { dw = src.width; dh = dw / ir; dx = 0; dy = (src.height - dh) / 2; }
   sctx.drawImage(img, dx, dy, dw, dh);
   customMaskCanvas = extractSketchMask(src);
-  autoMaskCanvas = null;
-  maskEditingAvailable = false;
-  maskTools.style.display = 'none';
+  autoMaskCanvas = cloneCanvas(customMaskCanvas);
+  maskEditingAvailable = true;
+  maskTools.style.display = 'block';
   mode = 'custom';
   renderStyleRow();
   renderReferenceRow();
@@ -1200,9 +1200,9 @@ sketchInput.addEventListener('change', (e) => {
       sctx.drawImage(img, dx, dy, dw, dh);
 
       customMaskCanvas = extractSketchMask(src);
-      autoMaskCanvas = null;
-      maskEditingAvailable = false;
-      maskTools.style.display = 'none';
+      autoMaskCanvas = cloneCanvas(customMaskCanvas);
+      maskEditingAvailable = true;
+      maskTools.style.display = 'block';
       mode = 'custom';
       sketchStatus.textContent = 'Traced — clean, high-contrast sketches work best.';
       renderStyleRow();
@@ -1545,6 +1545,7 @@ draw();
 </script>
 </body>
 </html>
+
 
 
 
