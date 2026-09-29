@@ -991,7 +991,7 @@ function extractSketchMask(srcCanvas){
   let isDark = new Uint8Array(w * h);
   for (let i = 0; i < w * h; i++){
     const lum = 0.299*data[i*4] + 0.587*data[i*4+1] + 0.114*data[i*4+2];
-    isDark[i] = lum < 170 ? 1 : 0;
+    isDark[i] = lum < 205 ? 1 : 0;
   }
   // Dilate the dark line a few times to seal small gaps in the pencil line
   // (real hand-drawn sketches almost always have tiny breaks the flood-fill would otherwise leak through)
