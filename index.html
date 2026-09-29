@@ -143,6 +143,14 @@
   .style-chip .en{ display:block; font-size:11.5px; font-weight:600; margin-top:4px; }
   .style-chip .ur{ display:block; font-size:10.5px; color:#948c7c; }
 
+  .mask-tools{margin:12px 0 18px 24px;padding:12px;background:#fff;border:1px solid var(--line);border-radius:12px;}
+  .mask-tools p{margin:0 0 9px;font-size:12px;color:#6b6355;line-height:1.45;}
+  .mask-tool-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .mask-tool-btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 10px;font:600 12px 'Work Sans',sans-serif;color:var(--ink);cursor:pointer;}
+  .mask-tool-btn.active{background:var(--teal);border-color:var(--teal);color:#fff;}
+  .mask-brush{display:flex;align-items:center;gap:6px;flex:1;min-width:125px;font-size:11px;color:#6b6355;}
+  .mask-brush input{width:100%;accent-color:var(--teal);}
+  #canvas.mask-editing{cursor:crosshair;touch-action:none;}
   .scale-row{
     margin-left:24px;
     display:flex;
@@ -378,6 +386,15 @@
       </div>
     </div>
 
+    <div class="mask-tools" id="maskTools" style="display:none;">
+      <p><b>Refine garment area</b> — draw directly on the preview to erase hands, face, background, or any spill. Paint restores an area you erased by mistake.</p>
+      <div class="mask-tool-row">
+        <button class="mask-tool-btn active" id="maskEraseBtn" type="button">Erase spill</button>
+        <button class="mask-tool-btn" id="maskPaintBtn" type="button">Restore area</button>
+        <label class="mask-brush">Brush <input id="maskBrushSize" type="range" min="8" max="70" value="28"></label>
+        <button class="mask-tool-btn" id="maskResetBtn" type="button">Reset</button>
+      </div>
+    </div>
     <div class="step">
       <div class="step-head">
         <span class="step-num">3</span>
@@ -624,6 +641,10 @@ let fabricImage = null;
 let selectedStyleId = STYLES[0].id;
 let mode = 'preset'; // 'preset' or 'custom' (from an uploaded design photo)
 let customMaskCanvas = null;
+let autoMaskCanvas = null;
+let maskEditingAvailable = false;
+let maskBrushMode = 'erase';
+let isMaskPainting = false;
 let customThumb = null;
 let segmenter = null;
 let trimColor = '#C9971C';
@@ -642,6 +663,73 @@ const designStatus = document.getElementById('designStatus');
 const sketchInput = document.getElementById('sketchInput');
 const sketchStatus = document.getElementById('sketchStatus');
 const trimRow = document.getElementById('trimRow');
+const maskTools = document.getElementById('maskTools');
+const maskEraseBtn = document.getElementById('maskEraseBtn');
+const maskPaintBtn = document.getElementById('maskPaintBtn');
+const maskBrushSize = document.getElementById('maskBrushSize');
+const maskResetBtn = document.getElementById('maskResetBtn');
+
+function cloneCanvas(source){
+  const copy = document.createElement('canvas');
+  copy.width = source.width;
+  copy.height = source.height;
+  copy.getContext('2d').drawImage(source, 0, 0);
+  return copy;
+}
+
+function setMaskBrushMode(mode){
+  maskBrushMode = mode;
+  maskEraseBtn.classList.toggle('active', mode === 'erase');
+  maskPaintBtn.classList.toggle('active', mode === 'paint');
+}
+maskEraseBtn.addEventListener('click', () => setMaskBrushMode('erase'));
+maskPaintBtn.addEventListener('click', () => setMaskBrushMode('paint'));
+maskResetBtn.addEventListener('click', () => {
+  if (!autoMaskCanvas) return;
+  customMaskCanvas = cloneCanvas(autoMaskCanvas);
+  draw();
+});
+
+function maskPoint(event){
+  const rect = canvas.getBoundingClientRect();
+  return { x:(event.clientX-rect.left)*canvas.width/rect.width, y:(event.clientY-rect.top)*canvas.height/rect.height };
+}
+function applyMaskBrush(event){
+  if (!maskEditingAvailable || mode !== 'custom' || !customMaskCanvas) return;
+  const point = maskPoint(event);
+  const mctx = customMaskCanvas.getContext('2d');
+  mctx.save();
+  mctx.globalCompositeOperation = maskBrushMode === 'erase' ? 'destination-out' : 'source-over';
+  mctx.strokeStyle = '#fff';
+  mctx.fillStyle = '#fff';
+  mctx.lineWidth = Number(maskBrushSize.value) * canvas.width / canvas.getBoundingClientRect().width;
+  mctx.lineCap = 'round';
+  mctx.lineJoin = 'round';
+  mctx.lineTo(point.x, point.y);
+  mctx.stroke();
+  mctx.beginPath();
+  mctx.arc(point.x, point.y, mctx.lineWidth/2, 0, Math.PI*2);
+  mctx.fill();
+  mctx.beginPath();
+  mctx.moveTo(point.x, point.y);
+  mctx.restore();
+  draw();
+}
+canvas.addEventListener('pointerdown', (event) => {
+  if (!maskEditingAvailable || mode !== 'custom') return;
+  isMaskPainting = true;
+  canvas.classList.add('mask-editing');
+  const point = maskPoint(event);
+  const mctx = customMaskCanvas.getContext('2d');
+  mctx.beginPath();
+  mctx.moveTo(point.x, point.y);
+  applyMaskBrush(event);
+  canvas.setPointerCapture(event.pointerId);
+});
+canvas.addEventListener('pointermove', (event) => { if (isMaskPainting) applyMaskBrush(event); });
+function stopMaskPainting(){ isMaskPainting = false; canvas.classList.remove('mask-editing'); }
+canvas.addEventListener('pointerup', stopMaskPainting);
+canvas.addEventListener('pointercancel', stopMaskPainting);
 
 function rgbToHsl(r, g, b){
   r/=255; g/=255; b/=255;
@@ -785,6 +873,7 @@ function renderStyleRow(){
     btn.innerHTML = miniSvg(style) + `<span class="en">${style.en}</span><span class="ur">${style.ur}</span>`;
     btn.addEventListener('click', () => {
       mode = 'preset';
+      maskTools.style.display = 'none';
       selectedStyleId = style.id;
       renderStyleRow();
       draw();
@@ -799,6 +888,7 @@ function renderStyleRow(){
     btn.addEventListener('click', () => {
       if (!customMaskCanvas) return;
       mode = 'custom';
+      maskTools.style.display = maskEditingAvailable ? 'block' : 'none';
       renderStyleRow();
       draw();
       runAiPreview();
@@ -970,6 +1060,9 @@ designInput.addEventListener('change', (e) => {
           }
           mctx.putImageData(imgData, 0, 0);
           customMaskCanvas = maskCanvas;
+          autoMaskCanvas = cloneCanvas(maskCanvas);
+          maskEditingAvailable = true;
+          maskTools.style.display = 'block';
           mode = 'custom';
           designStatus.textContent = 'Detected automatically — edges may be rough.';
           renderStyleRow();
@@ -1047,6 +1140,9 @@ function processSketchImage(img, dataUrl){
   else { dw = src.width; dh = dw / ir; dx = 0; dy = (src.height - dh) / 2; }
   sctx.drawImage(img, dx, dy, dw, dh);
   customMaskCanvas = extractSketchMask(src);
+  autoMaskCanvas = null;
+  maskEditingAvailable = false;
+  maskTools.style.display = 'none';
   mode = 'custom';
   renderStyleRow();
   renderReferenceRow();
@@ -1104,6 +1200,9 @@ sketchInput.addEventListener('change', (e) => {
       sctx.drawImage(img, dx, dy, dw, dh);
 
       customMaskCanvas = extractSketchMask(src);
+      autoMaskCanvas = null;
+      maskEditingAvailable = false;
+      maskTools.style.display = 'none';
       mode = 'custom';
       sketchStatus.textContent = 'Traced — clean, high-contrast sketches work best.';
       renderStyleRow();
@@ -1446,3 +1545,6 @@ draw();
 </script>
 </body>
 </html>
+
+
+
