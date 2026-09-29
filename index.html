@@ -457,7 +457,7 @@
       <input type="file" id="batchFabricInput" accept="image/*" multiple>
     </label>
 
-    <div class="step-sub" style="margin:16px 0 8px; margin-left:0;">Styles to include</div>
+    <div class="step-sub" style="margin:16px 0 8px; margin-left:0;">Reference designs to include</div>
     <div id="batchStyleList" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
 
     <button class="cta primary" id="batchGenerateBtn" style="width:100%; margin-top:18px;" disabled>Generate ZIP</button>
@@ -988,10 +988,26 @@ function extractSketchMask(srcCanvas){
   const w = srcCanvas.width, h = srcCanvas.height;
   const sctx = srcCanvas.getContext('2d');
   const data = sctx.getImageData(0, 0, w, h).data;
-  const isDark = new Uint8Array(w * h);
+  let isDark = new Uint8Array(w * h);
   for (let i = 0; i < w * h; i++){
     const lum = 0.299*data[i*4] + 0.587*data[i*4+1] + 0.114*data[i*4+2];
-    isDark[i] = lum < 150 ? 1 : 0;
+    isDark[i] = lum < 170 ? 1 : 0;
+  }
+  // Dilate the dark line a few times to seal small gaps in the pencil line
+  // (real hand-drawn sketches almost always have tiny breaks the flood-fill would otherwise leak through)
+  for (let pass = 0; pass < 7; pass++){
+    const next = new Uint8Array(isDark);
+    for (let y = 0; y < h; y++){
+      for (let x = 0; x < w; x++){
+        const idx = y*w + x;
+        if (isDark[idx]) continue;
+        if ((x > 0 && isDark[idx-1]) || (x < w-1 && isDark[idx+1]) ||
+            (y > 0 && isDark[idx-w]) || (y < h-1 && isDark[idx+w])){
+          next[idx] = 1;
+        }
+      }
+    }
+    isDark = next;
   }
   const outside = new Uint8Array(w * h);
   const stack = [];
@@ -1233,21 +1249,66 @@ function renderCompositeToCanvas(targetCanvas, fabricImg, style, trimColorHex, r
   if (style.flowers) style.flowers.forEach(f => drawFlowerDot(tctx, f[0], f[1], f[2], trimColorHex));
 }
 
+const referenceMaskCache = {};
+function getReferenceMask(ref){
+  if (referenceMaskCache[ref.id]) return Promise.resolve(referenceMaskCache[ref.id]);
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const src = document.createElement('canvas');
+      src.width = 400; src.height = 600;
+      const sctx = src.getContext('2d');
+      sctx.fillStyle = '#ffffff';
+      sctx.fillRect(0, 0, 400, 600);
+      const ir = img.width / img.height, cr = 400 / 600;
+      let dw, dh, dx, dy;
+      if (ir > cr){ dh = 600; dw = dh * ir; dx = (400 - dw) / 2; dy = 0; }
+      else { dw = 400; dh = dw / ir; dx = 0; dy = (600 - dh) / 2; }
+      sctx.drawImage(img, dx, dy, dw, dh);
+      const mask = extractSketchMask(src);
+      referenceMaskCache[ref.id] = mask;
+      resolve(mask);
+    };
+    img.onerror = reject;
+    img.src = ref.img;
+  });
+}
+
+function renderMaskCompositeToCanvas(targetCanvas, fabricImg, maskCanvas, repeatsAcross){
+  const tctx = targetCanvas.getContext('2d');
+  tctx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+  const tileW = targetCanvas.width / (repeatsAcross || 4);
+  const tileH = tileW * (fabricImg.height / fabricImg.width);
+  const off = document.createElement('canvas');
+  off.width = Math.max(1, tileW);
+  off.height = Math.max(1, tileH);
+  off.getContext('2d').drawImage(fabricImg, 0, 0, tileW, tileH);
+  const pattern = tctx.createPattern(off, 'repeat');
+  const tmp = document.createElement('canvas');
+  tmp.width = targetCanvas.width; tmp.height = targetCanvas.height;
+  const ttctx = tmp.getContext('2d');
+  ttctx.fillStyle = pattern;
+  ttctx.fillRect(0, 0, tmp.width, tmp.height);
+  ttctx.globalCompositeOperation = 'destination-in';
+  ttctx.drawImage(maskCanvas, 0, 0);
+  tctx.drawImage(tmp, 0, 0);
+}
+
 const batchStyleList = document.getElementById('batchStyleList');
-const batchSelectedStyles = new Set(STYLES.map(s => s.id));
+const batchSelectedRefs = new Set(REFERENCE_DESIGNS.map(r => r.id));
 function renderBatchStyleList(){
   batchStyleList.innerHTML = '';
-  STYLES.forEach(style => {
+  REFERENCE_DESIGNS.forEach(ref => {
     const label = document.createElement('label');
     label.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:11.5px;background:#fff;padding:7px 9px;border-radius:8px;border:1px solid var(--line);cursor:pointer;';
     const cb = document.createElement('input');
     cb.type = 'checkbox';
-    cb.checked = batchSelectedStyles.has(style.id);
+    cb.checked = batchSelectedRefs.has(ref.id);
     cb.addEventListener('change', () => {
-      if (cb.checked) batchSelectedStyles.add(style.id); else batchSelectedStyles.delete(style.id);
+      if (cb.checked) batchSelectedRefs.add(ref.id); else batchSelectedRefs.delete(ref.id);
     });
     label.appendChild(cb);
-    label.append(style.en);
+    label.append(ref.en);
     batchStyleList.appendChild(label);
   });
 }
@@ -1280,9 +1341,9 @@ function loadImageFromFile(file){
 }
 
 batchGenerateBtn.addEventListener('click', async () => {
-  const styles = STYLES.filter(s => batchSelectedStyles.has(s.id));
-  if (!batchFabricFiles.length || !styles.length){
-    batchStatus.textContent = 'Select at least one fabric and one style first.';
+  const refs = REFERENCE_DESIGNS.filter(r => batchSelectedRefs.has(r.id));
+  if (!batchFabricFiles.length || !refs.length){
+    batchStatus.textContent = 'Select at least one fabric and one reference design first.';
     return;
   }
   batchGenerateBtn.disabled = true;
@@ -1290,19 +1351,21 @@ batchGenerateBtn.addEventListener('click', async () => {
   const offCanvas = document.createElement('canvas');
   offCanvas.width = 400; offCanvas.height = 600;
   let count = 0;
-  const total = batchFabricFiles.length * styles.length;
+  const total = batchFabricFiles.length * refs.length;
+
+  batchStatus.textContent = 'Tracing reference designs…';
+  const masks = {};
+  for (const ref of refs){ masks[ref.id] = await getReferenceMask(ref); }
 
   for (let fi = 0; fi < batchFabricFiles.length; fi++){
     const file = batchFabricFiles[fi];
     batchStatus.textContent = 'Loading fabric ' + (fi + 1) + '/' + batchFabricFiles.length + '…';
     let img;
     try { img = await loadImageFromFile(file); } catch (e) { continue; }
-    const suggestions = suggestTrims(img);
-    const trimHex = suggestions[0].hex;
-    for (const style of styles){
-      renderCompositeToCanvas(offCanvas, img, style, trimHex, 4);
+    for (const ref of refs){
+      renderMaskCompositeToCanvas(offCanvas, img, masks[ref.id], 4);
       const blob = await new Promise(res => offCanvas.toBlob(res, 'image/png'));
-      zip.file('fabric' + (fi + 1) + '_' + style.id + '.png', blob);
+      zip.file('fabric' + (fi + 1) + '_' + ref.id + '.png', blob);
       count++;
       batchStatus.textContent = 'Generated ' + count + '/' + total + '…';
     }
